@@ -1,0 +1,76 @@
+temp_counter = 0  # Counter to generate temporary variables
+instructions = []  # List to store the generated TAC instructions
+
+def new_temp():
+    """Generates a new temporary variable."""
+    global temp_counter
+    temp_counter += 1
+    return f"t{temp_counter}"
+
+def precedence(op):
+    """Returns the precedence of an operator."""
+    if op in ('+', '-'):
+        return 1
+    if op in ('*', '/'):
+        return 2
+    return 0
+
+def infix_to_postfix(expression):
+    """
+    Converts an infix expression to postfix notation.
+    :param expression: String of the expression (e.g., "a * (b + c) - d / e").
+    :return: List of tokens in postfix order.
+    """
+    tokens = expression.split()
+    output = []  # List for postfix notation
+    operators = []  # Stack for operators
+
+    for token in tokens:
+        if token.isalnum():  # Operand
+            output.append(token)
+        elif token == '(':  # Open parenthesis
+            operators.append(token)
+        elif token == ')':  # Close parenthesis
+            while operators and operators[-1] != '(':
+                output.append(operators.pop())
+            operators.pop()  # Remove the open parenthesis
+        elif token in "+-*/":  # Operator
+            while (operators and operators[-1] != '(' and 
+                   precedence(operators[-1]) >= precedence(token)):
+                output.append(operators.pop())
+            operators.append(token)
+
+    while operators:  # Pop any remaining operators
+        output.append(operators.pop())
+
+    return output
+
+def generate_tac(expression):
+    """
+    Converts an arithmetic expression into Three Address Code.
+    :param expression: String of the expression (e.g., "a * (b + c) - d / e").
+    :return: List of TAC instructions.
+    """
+    postfix = infix_to_postfix(expression)  # Convert to postfix notation
+    stack = []  # Stack for intermediate results
+
+    for token in postfix:
+        if token.isalnum():  # Operand
+            stack.append(token)
+        elif token in "+-*/":  # Operator
+            op2 = stack.pop()
+            op1 = stack.pop()
+            temp = new_temp()
+            instructions.append(f"{temp} = {op1} {token} {op2}")
+            stack.append(temp)
+
+    return instructions
+
+# Example Usage
+expression = "a * ( b + c ) - d / e"
+result = generate_tac(expression)
+
+# Print the results
+print("Three Address Code:")
+for instr in result:
+    print(instr)
