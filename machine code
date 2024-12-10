@@ -1,0 +1,151 @@
+class ASTNode:
+    def __init__(self, value, left=None, right=None):
+        self.value = value  # Operator or Operand (variable or constant)
+        self.left = left    # Left child (could be operand or another operator)
+        self.right = right  # Right child (could be operand or another operator)
+
+
+class CodeGenerator:
+    def __init__(self):
+        self.temp_count = 1  # To create unique temporary variables (t1, t2, etc.)
+        self.tac = []        # List to store Three-Address Code (TAC)
+
+    def generate_TAC(self, node):
+        """Recursively generate TAC from AST."""
+        if node is None:
+            return
+
+        if node.value == '=':
+            # Assignment operation: lhs = rhs
+            lhs = node.left.value
+            rhs = self.generate_TAC(node.right)
+            self.tac.append(f"{lhs} = {rhs}")
+            return lhs
+
+        elif node.value in ['+', '*']:
+            # Operators (+, *)
+            left = self.generate_TAC(node.left)
+            right = self.generate_TAC(node.right)
+            temp_var = f"t{self.temp_count}"
+            self.tac.append(f"{temp_var} = {left} {node.value} {right}")
+            self.temp_count += 1
+            return temp_var
+
+        else:
+            # Leaf node (variable or constant)
+            return node.value
+
+    def get_TAC(self):
+        return self.tac
+
+
+class AssemblyCodeGenerator:
+    def __init__(self):
+        self.registers = ["R0", "R1", "R2", "R3", "R4", "R5"]
+        self.reg_count = 0  # To track the registers being used
+        self.assembly_code = []  # List to store the generated assembly code
+
+    def generate_assembly(self, tac):
+        """Generate assembly code from TAC."""
+        for instruction in tac:
+            parts = instruction.split(" = ")
+            lhs = parts[0].strip()
+            rhs = parts[1].strip()
+
+            if rhs in self.registers:
+                # If the right-hand side is already in a register
+                self.assembly_code.append(f"MOV {lhs}, {rhs}")
+            else:
+                # Handle temporary variables and operators like * or +
+                if "*" in rhs:
+                    operand1, operand2 = rhs.split(" * ")
+                    self.assembly_code.append(f"MUL {self.get_register()}, {operand1}, {operand2}")
+                elif "+" in rhs:
+                    operand1, operand2 = rhs.split(" + ")
+                    self.assembly_code.append(f"ADD {self.get_register()}, {operand1}, {operand2}")
+                else:
+                    self.assembly_code.append(f"MOV {self.get_register()}, {rhs}")
+
+        return self.assembly_code
+
+    def get_register(self):
+        # Get the next available register
+        reg = self.registers[self.reg_count % len(self.registers)]
+        self.reg_count += 1
+        return reg
+def precedence(op):
+    """Returns the precedence of an operator."""
+    if op == '+' or op == '-':
+        return 1
+    if op == '*' or op == '/':
+        return 2
+    return 0
+def infix_to_postfix(expression):
+    """
+    Converts an infix expression to postfix notation.
+    :param expression: String of the expression (e.g., "a + b * c").
+    :return: List of tokens in postfix order.
+    """
+    tokens = expression.split()  # Split the expression into tokens
+    output = []  # List for postfix notation
+    operators = []  # Stack for operators
+
+    for token in tokens:
+        if token.isalnum():  # Operand
+            output.append(token)
+        elif token in "+-*/":  # Operator
+            while (operators and precedence(operators[-1]) >= precedence(token)):
+                output.append(operators.pop())
+            operators.append(token)
+    
+    # Pop any remaining operators
+    while operators:
+        output.append(operators.pop())
+
+    return output
+
+def build_ast(expression):
+    """Helper function to build AST dynamically."""
+    tokens = expression
+    stack = []
+
+    for token in tokens:
+        if token in ['+', '*', '=']:
+            # If it's an operator, pop two operands from the stack
+            right = stack.pop()
+            left = stack.pop()
+            stack.append(ASTNode(token, left, right))
+        else:
+            # If it's an operand, push it to the stack
+            stack.append(ASTNode(token))
+
+    return stack[-1]
+
+
+# Main Functionality
+if __name__ == "__main__":
+    # Take input for the expression
+    expression = input("Enter the expression :\n")
+    
+    expression=infix_to_postfix(expression)
+    print(expression)
+    
+    # Build the AST from the input expression
+    ast = build_ast(expression)
+
+    # Generate TAC
+    code_generator = CodeGenerator()
+    code_generator.generate_TAC(ast)
+    tac = code_generator.get_TAC()
+
+    print("\nThree-Address Code (TAC):")
+    for line in tac:
+        print(line)
+
+    # Generate Assembly Code
+    assembly_generator = AssemblyCodeGenerator()
+    assembly_code = assembly_generator.generate_assembly(tac)
+
+    print("\nAssembly Code:")
+    for line in assembly_code:
+        print(line)
